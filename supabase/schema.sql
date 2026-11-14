@@ -515,3 +515,39 @@ USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT
 CREATE POLICY "Trainers can delete workout checkins in their workspace"
 ON public.workout_checkins FOR DELETE
 USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+-- =========================================================================
+-- 12. DEMO WORKSPACE & PUBLIC DEMO POLICIES
+-- =========================================================================
+ALTER TABLE public.workspaces ALTER COLUMN user_id DROP NOT NULL;
+ALTER TABLE public.workspaces ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT false;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workspaces_demo ON public.workspaces (is_demo) WHERE is_demo = true;
+
+CREATE POLICY "Anyone can view demo workspace"
+ON public.workspaces FOR SELECT TO anon, authenticated
+USING (is_demo = true);
+
+CREATE POLICY "Anyone can view demo clients"
+ON public.clients FOR SELECT TO anon, authenticated
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE is_demo = true));
+
+CREATE POLICY "Anyone can view demo workout plans"
+ON public.workout_plans FOR SELECT TO anon, authenticated
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE is_demo = true));
+
+CREATE POLICY "Anyone can view demo workout plan items"
+ON public.workout_plan_items FOR SELECT TO anon, authenticated
+USING (plan_id IN (SELECT id FROM public.workout_plans WHERE workspace_id IN (SELECT id FROM public.workspaces WHERE is_demo = true)));
+
+CREATE POLICY "Anyone can view demo nutrition plans"
+ON public.nutrition_plans FOR SELECT TO anon, authenticated
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE is_demo = true));
+
+CREATE POLICY "Anyone can view demo nutrition plan items"
+ON public.nutrition_plan_items FOR SELECT TO anon, authenticated
+USING (plan_id IN (SELECT id FROM public.nutrition_plans WHERE workspace_id IN (SELECT id FROM public.workspaces WHERE is_demo = true)));
+
+CREATE POLICY "Anyone can view demo progress logs"
+ON public.progress_logs FOR SELECT TO anon, authenticated
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE is_demo = true));
+

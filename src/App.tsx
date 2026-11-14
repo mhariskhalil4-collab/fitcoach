@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase'
 import AuthCard from './components/AuthCard'
 import Dashboard from './components/Dashboard'
 import PublicPlanView from './components/PublicPlanView'
+import DemoView from './components/DemoView'
 import { 
   Dumbbell, 
   Salad, 
@@ -11,7 +12,8 @@ import {
   ArrowRight,
   Sparkles,
   LogIn,
-  UserPlus
+  UserPlus,
+  Eye
 } from 'lucide-react'
 
 export default function App() {
@@ -22,11 +24,25 @@ export default function App() {
     return <PublicPlanView token={publicPlanMatch[1]} />
   }
 
+  // 1. Public demo route: /demo accessible without login
+  if (pathname === '/demo' || pathname === '/demo/') {
+    return <DemoView />
+  }
+
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [authView, setAuthView] = useState<'home' | 'login' | 'signup'>('home')
 
   useEffect(() => {
+    // Check URL parameters for explicit auth triggers
+    if (typeof window !== 'undefined') {
+      if (window.location.search.includes('auth=signup')) {
+        setAuthView('signup')
+      } else if (window.location.search.includes('auth=login')) {
+        setAuthView('login')
+      }
+    }
+
     // 1. Check active session on initial mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
@@ -120,6 +136,13 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
+            <a
+              href="/demo"
+              className="px-3 py-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40 rounded-lg transition flex items-center gap-1.5"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              View Demo
+            </a>
             <button
               onClick={() => setAuthView('login')}
               className="px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
@@ -167,6 +190,13 @@ export default function App() {
               Start Free Trial
               <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
             </button>
+            <a
+              href="/demo"
+              className="w-full sm:w-auto px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/60 font-semibold rounded-xl text-base transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/5"
+            >
+              <Eye className="h-4 w-4 text-emerald-400" />
+              View Demo
+            </a>
             <button
               onClick={() => setAuthView('login')}
               className="w-full sm:w-auto px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-slate-700 font-medium rounded-xl text-base transition flex items-center justify-center gap-2 cursor-pointer"
