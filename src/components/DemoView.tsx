@@ -80,14 +80,134 @@ const MEAL_TYPE_BADGES: Record<string, { label: string; badge: string }> = {
   snack: { label: 'Snack', badge: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20' },
 }
 
+const FALLBACK_CLIENTS: DemoClient[] = [
+  {
+    id: 'd0000000-0000-0000-0000-000000000011',
+    name: 'Sara',
+    goal: 'lose weight',
+    fitness_level: 'beginner',
+    age: 28,
+    gender: 'Female',
+    weight_kg: 68.0,
+    height_cm: 165,
+    notes: 'Sedentary office routine, aiming to shed 5kg with calorie control and resistance training.',
+  },
+  {
+    id: 'd0000000-0000-0000-0000-000000000012',
+    name: 'Ahmed',
+    goal: 'build muscle',
+    fitness_level: 'intermediate',
+    age: 25,
+    gender: 'Male',
+    weight_kg: 74.5,
+    height_cm: 178,
+    notes: 'Focusing on upper/lower hypertrophy progression, progressive overload, and surplus calories.',
+  },
+  {
+    id: 'd0000000-0000-0000-0000-000000000013',
+    name: 'Bilal',
+    goal: 'get fit',
+    fitness_level: 'intermediate',
+    age: 32,
+    gender: 'Male',
+    weight_kg: 80.0,
+    height_cm: 182,
+    notes: 'Targeting athletic cardiovascular endurance, core strength, and overall functional fitness.',
+  },
+]
+
+const FALLBACK_WORKOUT_PLANS: DemoWorkoutPlan[] = [
+  {
+    id: 'd0000000-0000-0000-0000-000000000021',
+    client_id: 'd0000000-0000-0000-0000-000000000011',
+    name: "Sara's Fat-Loss Full Body Circuit",
+    day: 'Monday, Wednesday, Friday',
+    items: [
+      { id: '1', sets: 3, reps: '12', exercise: { name: 'Squat', muscle_group: 'Quadriceps & Glutes', equipment: 'Barbell' } },
+      { id: '2', sets: 3, reps: '10', exercise: { name: 'Push-up', muscle_group: 'Chest & Core', equipment: 'Bodyweight' } },
+      { id: '3', sets: 3, reps: '10', exercise: { name: 'Lunge', muscle_group: 'Quadriceps & Glutes', equipment: 'Dumbbells' } },
+      { id: '4', sets: 3, reps: '45s', exercise: { name: 'Plank', muscle_group: 'Core & Stability', equipment: 'Bodyweight' } },
+    ],
+  },
+  {
+    id: 'd0000000-0000-0000-0000-000000000022',
+    client_id: 'd0000000-0000-0000-0000-000000000012',
+    name: "Ahmed's Hypertrophy Strength Routine",
+    day: 'Tuesday, Thursday, Saturday',
+    items: [
+      { id: '5', sets: 4, reps: '8', exercise: { name: 'Bench Press', muscle_group: 'Chest & Triceps', equipment: 'Barbell' } },
+      { id: '6', sets: 4, reps: '10', exercise: { name: 'Barbell Row', muscle_group: 'Upper Back & Lats', equipment: 'Barbell' } },
+      { id: '7', sets: 3, reps: '10', exercise: { name: 'Overhead Press', muscle_group: 'Shoulders & Core', equipment: 'Barbell' } },
+      { id: '8', sets: 3, reps: '12', exercise: { name: 'Bicep Curl', muscle_group: 'Biceps', equipment: 'Dumbbells' } },
+    ],
+  },
+  {
+    id: 'd0000000-0000-0000-0000-000000000023',
+    client_id: 'd0000000-0000-0000-0000-000000000013',
+    name: "Bilal's Functional Conditioning Plan",
+    day: 'Monday, Thursday, Saturday',
+    items: [
+      { id: '9', sets: 3, reps: '8', exercise: { name: 'Deadlift', muscle_group: 'Hamstrings & Back', equipment: 'Barbell' } },
+      { id: '10', sets: 3, reps: '8', exercise: { name: 'Pull-up', muscle_group: 'Lats & Biceps', equipment: 'Pull-up Bar' } },
+      { id: '11', sets: 3, reps: '12', exercise: { name: 'Leg Press', muscle_group: 'Quadriceps & Glutes', equipment: 'Leg Press Machine' } },
+      { id: '12', sets: 3, reps: '60s', exercise: { name: 'Plank', muscle_group: 'Core & Stability', equipment: 'Bodyweight' } },
+    ],
+  },
+]
+
+const FALLBACK_NUTRITION_PLANS: DemoNutritionPlan[] = [
+  {
+    id: 'd0000000-0000-0000-0000-000000000031',
+    client_id: 'd0000000-0000-0000-0000-000000000011',
+    name: "Sara's 1,800 kcal Balanced Deficit",
+    daily_calories: 1800,
+    items: [
+      { id: '1', portion: '1 bowl', meal_type: 'breakfast', meal: { name: 'Oats with Milk', calories: 350, protein_g: 15, carbs_g: 55, fat_g: 8 } },
+      { id: '2', portion: '1 large bowl', meal_type: 'lunch', meal: { name: 'Chicken Salad', calories: 420, protein_g: 38, carbs_g: 14, fat_g: 22 } },
+      { id: '3', portion: '1 glass', meal_type: 'snack', meal: { name: 'Fruit Smoothie', calories: 210, protein_g: 6, carbs_g: 44, fat_g: 2 } },
+      { id: '4', portion: '1 plate', meal_type: 'dinner', meal: { name: 'Grilled Fish with Vegetables', calories: 460, protein_g: 40, carbs_g: 20, fat_g: 16 } },
+    ],
+  },
+  {
+    id: 'd0000000-0000-0000-0000-000000000032',
+    client_id: 'd0000000-0000-0000-0000-000000000012',
+    name: "Ahmed's 2,800 kcal Hypertrophy Fuel",
+    daily_calories: 2800,
+    items: [
+      { id: '5', portion: '3 eggs + 2 slices toast', meal_type: 'breakfast', meal: { name: 'Eggs and Toast', calories: 380, protein_g: 22, carbs_g: 30, fat_g: 18 } },
+      { id: '6', portion: '200g chicken + 1.5 cups rice', meal_type: 'lunch', meal: { name: 'Grilled Chicken with Rice', calories: 520, protein_g: 45, carbs_g: 60, fat_g: 10 } },
+      { id: '7', portion: '50g mixed nuts', meal_type: 'snack', meal: { name: 'Nuts Mix', calories: 280, protein_g: 8, carbs_g: 10, fat_g: 24 } },
+      { id: '8', portion: '1 large bowl', meal_type: 'dinner', meal: { name: 'Beef Stir Fry', calories: 550, protein_g: 42, carbs_g: 40, fat_g: 22 } },
+    ],
+  },
+  {
+    id: 'd0000000-0000-0000-0000-000000000033',
+    client_id: 'd0000000-0000-0000-0000-000000000013',
+    name: "Bilal's 2,200 kcal Energy & Maintenance",
+    daily_calories: 2200,
+    items: [
+      { id: '9', portion: '1 bowl', meal_type: 'breakfast', meal: { name: 'Oats with Milk', calories: 350, protein_g: 15, carbs_g: 55, fat_g: 8 } },
+      { id: '10', portion: '1 sandwich', meal_type: 'lunch', meal: { name: 'Tuna Sandwich', calories: 400, protein_g: 32, carbs_g: 42, fat_g: 11 } },
+      { id: '11', portion: '1 cup', meal_type: 'snack', meal: { name: 'Yogurt with Fruit', calories: 220, protein_g: 14, carbs_g: 32, fat_g: 4 } },
+      { id: '12', portion: '1 bowl daal + 2 rotis', meal_type: 'dinner', meal: { name: 'Daal with Roti', calories: 450, protein_g: 18, carbs_g: 72, fat_g: 9 } },
+    ],
+  },
+]
+
+const FALLBACK_PROGRESS_LOGS: DemoProgressLog[] = [
+  { id: '1', log_date: '2026-10-31', weight_kg: 70.0, notes: 'Initial assessment with Alex. Excited to start the fat-loss journey!' },
+  { id: '2', log_date: '2026-11-07', weight_kg: 69.1, notes: 'Week 1 completed! Energy is great during workout sessions and sticking to 1,800 kcal.' },
+  { id: '3', log_date: '2026-11-14', weight_kg: 68.0, notes: 'Week 2 progress: down 2.0 kg! Squat and push-up form feels noticeably stronger.' },
+]
+
 export default function DemoView() {
   const [trainerName] = useState('Alex Fitness')
-  const [clients, setClients] = useState<DemoClient[]>([])
-  const [workoutPlans, setWorkoutPlans] = useState<DemoWorkoutPlan[]>([])
-  const [nutritionPlans, setNutritionPlans] = useState<DemoNutritionPlan[]>([])
-  const [progressLogs, setProgressLogs] = useState<DemoProgressLog[]>([])
-  const [selectedClientId, setSelectedClientId] = useState<string>('')
-  const [loading, setLoading] = useState(true)
+  const [clients, setClients] = useState<DemoClient[]>(FALLBACK_CLIENTS)
+  const [workoutPlans, setWorkoutPlans] = useState<DemoWorkoutPlan[]>(FALLBACK_WORKOUT_PLANS)
+  const [nutritionPlans, setNutritionPlans] = useState<DemoNutritionPlan[]>(FALLBACK_NUTRITION_PLANS)
+  const [progressLogs, setProgressLogs] = useState<DemoProgressLog[]>(FALLBACK_PROGRESS_LOGS)
+  const [selectedClientId, setSelectedClientId] = useState<string>('d0000000-0000-0000-0000-000000000011')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     async function loadDemoData() {

@@ -296,7 +296,7 @@ USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = auth.ui
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={seedSampleClients}
             disabled={isSeeding || loading || tableMissing}
