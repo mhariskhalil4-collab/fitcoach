@@ -60,3 +60,35 @@ export interface WorkoutPlan {
   client?: Client
   items?: (WorkoutPlanItem & { exercise?: Exercise })[]
 }
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+
+export interface Meal {
+  id: string
+  name: string
+  meal_type: MealType
+  calories: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+}
+
+export interface NutritionPlanItem {
+  id?: string
+  plan_id?: string
+  meal_id: string
+  meal_type: MealType
+  portion: string
+  meal?: Meal
+}
+
+export interface NutritionPlan {
+  id: string
+  workspace_id: string
+  client_id: string
+  name: string
+  daily_calories: number
+  created_at: string
+  client?: Client
+  items?: (NutritionPlanItem & { meal?: Meal })[]
+}

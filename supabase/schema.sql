@@ -247,3 +247,148 @@ USING (
     WHERE workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = auth.uid())
   )
 );
+
+-- =========================================================================
+-- 6. MEALS TABLE & 12 SEEDED MEALS
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.meals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL UNIQUE,
+    meal_type TEXT NOT NULL CHECK (meal_type IN ('breakfast', 'lunch', 'dinner', 'snack')),
+    calories INTEGER NOT NULL,
+    protein_g NUMERIC(5,1) NOT NULL,
+    carbs_g NUMERIC(5,1) NOT NULL,
+    fat_g NUMERIC(5,1) NOT NULL
+);
+
+-- Enable RLS on meals
+ALTER TABLE public.meals ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone authenticated can view meals" ON public.meals;
+DROP POLICY IF EXISTS "Anyone authenticated can insert meals" ON public.meals;
+
+CREATE POLICY "Anyone authenticated can view meals"
+ON public.meals FOR SELECT
+TO authenticated
+USING (true);
+
+CREATE POLICY "Anyone authenticated can insert meals"
+ON public.meals FOR INSERT
+TO authenticated
+WITH CHECK (true);
+
+-- Seed 12 Realistic Core Meals
+INSERT INTO public.meals (name, meal_type, calories, protein_g, carbs_g, fat_g)
+VALUES
+  ('Oats with Milk', 'breakfast', 350, 15, 55, 8),
+  ('Eggs and Toast', 'breakfast', 380, 22, 30, 18),
+  ('Chicken Salad', 'lunch', 420, 38, 14, 22),
+  ('Grilled Chicken with Rice', 'lunch', 520, 45, 60, 10),
+  ('Daal with Roti', 'dinner', 450, 18, 72, 9),
+  ('Yogurt with Fruit', 'snack', 220, 14, 32, 4),
+  ('Tuna Sandwich', 'lunch', 400, 32, 42, 11),
+  ('Beef Stir Fry', 'dinner', 550, 42, 40, 22),
+  ('Lentil Soup', 'dinner', 320, 18, 48, 6),
+  ('Fruit Smoothie', 'snack', 210, 6, 44, 2),
+  ('Nuts Mix', 'snack', 280, 8, 10, 24),
+  ('Grilled Fish with Vegetables', 'dinner', 460, 40, 20, 16)
+ON CONFLICT (name) DO NOTHING;
+
+-- =========================================================================
+-- 7. NUTRITION PLANS TABLE
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.nutrition_plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+    client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    daily_calories INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Indexes for foreign keys
+CREATE INDEX IF NOT EXISTS idx_nutrition_plans_workspace_id ON public.nutrition_plans(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_nutrition_plans_client_id ON public.nutrition_plans(client_id);
+
+-- Enable RLS on nutrition_plans
+ALTER TABLE public.nutrition_plans ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Trainers can view nutrition plans in their workspace" ON public.nutrition_plans;
+DROP POLICY IF EXISTS "Trainers can insert nutrition plans in their workspace" ON public.nutrition_plans;
+DROP POLICY IF EXISTS "Trainers can update nutrition plans in their workspace" ON public.nutrition_plans;
+DROP POLICY IF EXISTS "Trainers can delete nutrition plans in their workspace" ON public.nutrition_plans;
+
+CREATE POLICY "Trainers can view nutrition plans in their workspace"
+ON public.nutrition_plans FOR SELECT
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can insert nutrition plans in their workspace"
+ON public.nutrition_plans FOR INSERT
+WITH CHECK (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can update nutrition plans in their workspace"
+ON public.nutrition_plans FOR UPDATE
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can delete nutrition plans in their workspace"
+ON public.nutrition_plans FOR DELETE
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+-- =========================================================================
+-- 8. NUTRITION PLAN ITEMS TABLE
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.nutrition_plan_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    plan_id UUID NOT NULL REFERENCES public.nutrition_plans(id) ON DELETE CASCADE,
+    meal_id UUID NOT NULL REFERENCES public.meals(id) ON DELETE CASCADE,
+    meal_type TEXT NOT NULL CHECK (meal_type IN ('breakfast', 'lunch', 'dinner', 'snack')),
+    portion TEXT NOT NULL DEFAULT '1 serving'
+);
+
+-- Indexes for foreign keys
+CREATE INDEX IF NOT EXISTS idx_nutrition_plan_items_plan_id ON public.nutrition_plan_items(plan_id);
+CREATE INDEX IF NOT EXISTS idx_nutrition_plan_items_meal_id ON public.nutrition_plan_items(meal_id);
+
+-- Enable RLS on nutrition_plan_items
+ALTER TABLE public.nutrition_plan_items ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Trainers can view nutrition plan items in their workspace" ON public.nutrition_plan_items;
+DROP POLICY IF EXISTS "Trainers can insert nutrition plan items in their workspace" ON public.nutrition_plan_items;
+DROP POLICY IF EXISTS "Trainers can update nutrition plan items in their workspace" ON public.nutrition_plan_items;
+DROP POLICY IF EXISTS "Trainers can delete nutrition plan items in their workspace" ON public.nutrition_plan_items;
+
+CREATE POLICY "Trainers can view nutrition plan items in their workspace"
+ON public.nutrition_plan_items FOR SELECT
+USING (
+  plan_id IN (
+    SELECT id FROM public.nutrition_plans
+    WHERE workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid()))
+  )
+);
+
+CREATE POLICY "Trainers can insert nutrition plan items in their workspace"
+ON public.nutrition_plan_items FOR INSERT
+WITH CHECK (
+  plan_id IN (
+    SELECT id FROM public.nutrition_plans
+    WHERE workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid()))
+  )
+);
+
+CREATE POLICY "Trainers can update nutrition plan items in their workspace"
+ON public.nutrition_plan_items FOR UPDATE
+USING (
+  plan_id IN (
+    SELECT id FROM public.nutrition_plans
+    WHERE workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid()))
+  )
+);
+
+CREATE POLICY "Trainers can delete nutrition plan items in their workspace"
+ON public.nutrition_plan_items FOR DELETE
+USING (
+  plan_id IN (
+    SELECT id FROM public.nutrition_plans
+    WHERE workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid()))
+  )
+);
