@@ -4,10 +4,12 @@ import ClientsManager from './ClientsManager'
 import WorkoutPlansManager from './WorkoutPlansManager'
 import NutritionPlansManager from './NutritionPlansManager'
 import AiCoachManager from './AiCoachManager'
+import ProgressManager from './ProgressManager'
 import { 
   Dumbbell, 
   Utensils,
   Sparkles,
+  TrendingUp,
   LogOut, 
   ShieldCheck, 
   Database, 
@@ -27,7 +29,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onSignOut }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'plans' | 'nutrition' | 'aicoach' | 'clients' | 'overview'>('plans')
+  const [activeTab, setActiveTab] = useState<'plans' | 'nutrition' | 'aicoach' | 'progress' | 'clients' | 'overview'>('plans')
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [allVisibleWorkspaces, setAllVisibleWorkspaces] = useState<Workspace[]>([])
@@ -238,6 +240,17 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
             <span>AI Coach</span>
           </button>
           <button
+            onClick={() => setActiveTab('progress')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 cursor-pointer ${
+              activeTab === 'progress'
+                ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <TrendingUp className="h-4 w-4" />
+            <span>Progress</span>
+          </button>
+          <button
             onClick={() => setActiveTab('clients')}
             className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'clients'
@@ -335,7 +348,15 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
           />
         )}
 
-        {/* Tab 4: Clients Page */}
+        {/* Tab 4: Progress Tracking Page */}
+        {activeTab === 'progress' && workspace && (
+          <ProgressManager
+            workspaceId={workspace.id}
+            clients={clients}
+          />
+        )}
+
+        {/* Tab 5: Clients Page */}
         {activeTab === 'clients' && workspace && (
           <ClientsManager
             workspaceId={workspace.id}

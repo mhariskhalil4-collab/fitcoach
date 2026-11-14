@@ -432,3 +432,81 @@ WITH CHECK (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (S
 CREATE POLICY "Trainers can delete their workspace ai generations"
 ON public.ai_plan_generations FOR DELETE
 USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+-- =========================================================================
+-- 10. PROGRESS LOGS TABLE
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.progress_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+    client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+    log_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    weight_kg NUMERIC(6,2) NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_progress_logs_workspace_id ON public.progress_logs(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_progress_logs_client_date ON public.progress_logs(client_id, log_date DESC);
+
+ALTER TABLE public.progress_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Trainers can view progress logs in their workspace" ON public.progress_logs;
+DROP POLICY IF EXISTS "Trainers can insert progress logs in their workspace" ON public.progress_logs;
+DROP POLICY IF EXISTS "Trainers can update progress logs in their workspace" ON public.progress_logs;
+DROP POLICY IF EXISTS "Trainers can delete progress logs in their workspace" ON public.progress_logs;
+
+CREATE POLICY "Trainers can view progress logs in their workspace"
+ON public.progress_logs FOR SELECT
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can insert progress logs in their workspace"
+ON public.progress_logs FOR INSERT
+WITH CHECK (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can update progress logs in their workspace"
+ON public.progress_logs FOR UPDATE
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can delete progress logs in their workspace"
+ON public.progress_logs FOR DELETE
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+-- =========================================================================
+-- 11. WORKOUT CHECKINS TABLE
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.workout_checkins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+    client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+    workout_plan_id UUID REFERENCES public.workout_plans(id) ON DELETE SET NULL,
+    checkin_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    completed BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_workout_checkins_workspace_id ON public.workout_checkins(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_workout_checkins_client_date ON public.workout_checkins(client_id, checkin_date DESC);
+
+ALTER TABLE public.workout_checkins ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Trainers can view workout checkins in their workspace" ON public.workout_checkins;
+DROP POLICY IF EXISTS "Trainers can insert workout checkins in their workspace" ON public.workout_checkins;
+DROP POLICY IF EXISTS "Trainers can update workout checkins in their workspace" ON public.workout_checkins;
+DROP POLICY IF EXISTS "Trainers can delete workout checkins in their workspace" ON public.workout_checkins;
+
+CREATE POLICY "Trainers can view workout checkins in their workspace"
+ON public.workout_checkins FOR SELECT
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can insert workout checkins in their workspace"
+ON public.workout_checkins FOR INSERT
+WITH CHECK (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can update workout checkins in their workspace"
+ON public.workout_checkins FOR UPDATE
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can delete workout checkins in their workspace"
+ON public.workout_checkins FOR DELETE
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));

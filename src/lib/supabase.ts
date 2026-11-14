@@ -144,3 +144,24 @@ export interface AiPlanGenerationRecord {
   rationale: string | null
   created_at: string
 }
+
+export interface ProgressLog {
+  id: string
+  workspace_id: string
+  client_id: string
+  log_date: string
+  weight_kg: number
+  notes: string | null
+  created_at: string
+}
+
+export interface WorkoutCheckin {
+  id: string
+  workspace_id: string
+  client_id: string
+  workout_plan_id: string | null
+  checkin_date: string
+  completed: boolean
+  created_at: string
+  workout_plan?: WorkoutPlan
+}
