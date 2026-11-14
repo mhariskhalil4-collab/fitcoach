@@ -1,7 +1,7 @@
--- FitCoach Supabase Schema Setup
+-- FitCoach Supabase Schema Setup & Duplicate Workspace Fix
 -- Run this in your Supabase Dashboard: SQL Editor -> New Query -> Run
 
--- 1. Create the workspaces table
+-- 1. Create the workspaces table if it doesn't already exist
 CREATE TABLE IF NOT EXISTS public.workspaces (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -9,11 +9,28 @@ CREATE TABLE IF NOT EXISTS public.workspaces (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 2. Turn ON Row Level Security (RLS)
+-- 2. Clean up any existing duplicate workspace rows, keeping the earliest created workspace per user
+DELETE FROM public.workspaces
+WHERE id NOT IN (
+    SELECT DISTINCT ON (user_id) id
+    FROM public.workspaces
+    ORDER BY user_id, created_at ASC
+);
+
+-- 3. Add UNIQUE constraint on user_id so duplicate workspaces are physically impossible
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'workspaces_user_id_unique'
+    ) THEN
+        ALTER TABLE public.workspaces ADD CONSTRAINT workspaces_user_id_unique UNIQUE (user_id);
+    END IF;
+END $$;
+
+-- 4. Turn ON Row Level Security (RLS)
 ALTER TABLE public.workspaces ENABLE ROW LEVEL SECURITY;
 
--- 3. Row Level Security Policies
--- Drop existing policies if any to avoid errors on re-run
+-- 5. Row Level Security Policies
 DROP POLICY IF EXISTS "Users can view their own workspace" ON public.workspaces;
 DROP POLICY IF EXISTS "Users can insert their own workspace" ON public.workspaces;
 DROP POLICY IF EXISTS "Users can update their own workspace" ON public.workspaces;
@@ -43,7 +60,7 @@ ON public.workspaces
 FOR DELETE
 USING (auth.uid() = user_id);
 
--- 4. Automatic workspace creation trigger on user signup
+-- 6. Sole mechanism for workspace creation: Database Trigger on auth.users signup
 CREATE OR REPLACE FUNCTION public.handle_new_user_workspace()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -55,7 +72,8 @@ BEGIN
   VALUES (
     NEW.id,
     COALESCE(NULLIF(NEW.raw_user_meta_data->>'trainer_name', ''), split_part(NEW.email, '@', 1), 'Coach')
-  );
+  )
+  ON CONFLICT (user_id) DO NOTHING;
   RETURN NEW;
 END;
 $$;

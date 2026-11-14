@@ -39,15 +39,6 @@ export default function AuthCard({ initialMode = 'login', onSuccess }: AuthCardP
 
         // If a session is established immediately (e.g., auto-confirm enabled)
         if (data.session && data.user) {
-          // Attempt to insert workspace immediately
-          try {
-            await supabase.from('workspaces').insert({
-              user_id: data.user.id,
-              trainer_name: trimmedName,
-            })
-          } catch (err) {
-            console.error('Initial workspace insert error:', err)
-          }
           setMessage('Account created successfully!')
           if (onSuccess) onSuccess()
         } else {
@@ -63,23 +54,8 @@ export default function AuthCard({ initialMode = 'login', onSuccess }: AuthCardP
 
         if (signInError) throw signInError
 
-        if (data.user) {
-          // Check if workspace exists, otherwise create it
-          const { data: existingWorkspace } = await supabase
-            .from('workspaces')
-            .select('id')
-            .limit(1)
-
-          if (!existingWorkspace || existingWorkspace.length === 0) {
-            const fallbackName =
-              data.user.user_metadata?.trainer_name || email.split('@')[0] || 'Trainer'
-            await supabase.from('workspaces').insert({
-              user_id: data.user.id,
-              trainer_name: fallbackName,
-            })
-          }
-
-          if (onSuccess) onSuccess()
+        if (data.user && onSuccess) {
+          onSuccess()
         }
       }
     } catch (err: unknown) {

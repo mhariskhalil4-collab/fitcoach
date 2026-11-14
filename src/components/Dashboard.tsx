@@ -28,8 +28,8 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
   const [userEmail, setUserEmail] = useState<string>('')
   const [userId, setUserId] = useState<string>('')
 
-  const fetchWorkspace = async () => {
-    setLoading(true)
+  const fetchWorkspace = async (retryCount = 0) => {
+    if (retryCount === 0) setLoading(true)
     setTableMissing(false)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -38,45 +38,48 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
       setUserEmail(user.email || '')
       setUserId(user.id)
 
-      // Query workspaces
+      // Query workspaces belonging to this user
       const { data, error } = await supabase
         .from('workspaces')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: true })
 
       if (error) {
-        // Table not found code in PostgREST is PGRST205 / 42P01
         if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
           setTableMissing(true)
+          setLoading(false)
           return
         }
         throw error
       }
 
-      setAllVisibleWorkspaces(data || [])
+      let list = data || []
 
-      if (data && data.length > 0) {
-        setWorkspace(data[0])
-      } else {
-        // If table exists but user has no workspace yet, auto-create one
-        const fallbackTrainer = 
-          user.user_metadata?.trainer_name || 
-          user.email?.split('@')[0] || 
-          'Personal Trainer'
+      // Fix requirement 2: Delete duplicate workspace rows so user has exactly 1 workspace
+      if (list.length > 1) {
+        // Keep the earliest created workspace, delete the duplicates
+        const primaryWorkspace = list[0]
+        const duplicateIds = list.slice(1).map((w) => w.id)
 
-        const { data: inserted, error: insertError } = await supabase
-          .from('workspaces')
-          .insert({
-            user_id: user.id,
-            trainer_name: fallbackTrainer,
-          })
-          .select()
-          .single()
-
-        if (!insertError && inserted) {
-          setWorkspace(inserted)
-          setAllVisibleWorkspaces([inserted])
+        try {
+          await supabase.from('workspaces').delete().in('id', duplicateIds)
+          list = [primaryWorkspace]
+        } catch (err) {
+          console.error('Error removing duplicate workspaces:', err)
         }
+      }
+
+      // If user just signed up and trigger is still executing, retry briefly (max 2 retries)
+      if (list.length === 0 && retryCount < 2) {
+        setTimeout(() => fetchWorkspace(retryCount + 1), 600)
+        return
+      }
+
+      setAllVisibleWorkspaces(list)
+      if (list.length > 0) {
+        setWorkspace(list[0])
+      } else {
+        setWorkspace(null)
       }
     } catch (err) {
       console.error('Error fetching workspace:', err)
@@ -89,27 +92,22 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
     fetchWorkspace()
   }, [])
 
-  const sqlSetupScript = `-- Run this in your Supabase Dashboard: SQL Editor -> New Query -> Run
-CREATE TABLE IF NOT EXISTS public.workspaces (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    trainer_name TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  const sqlSetupScript = `-- Clean up duplicate workspaces & enforce single workspace per user
+DELETE FROM public.workspaces
+WHERE id NOT IN (
+    SELECT DISTINCT ON (user_id) id
+    FROM public.workspaces
+    ORDER BY user_id, created_at ASC
 );
 
-ALTER TABLE public.workspaces ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view their own workspace"
-ON public.workspaces FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert their own workspace"
-ON public.workspaces FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update their own workspace"
-ON public.workspaces FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete their own workspace"
-ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'workspaces_user_id_unique'
+    ) THEN
+        ALTER TABLE public.workspaces ADD CONSTRAINT workspaces_user_id_unique UNIQUE (user_id);
+    END IF;
+END $$;`
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(sqlSetupScript)
@@ -166,7 +164,7 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
               Coach Dashboard
             </div>
             
-            {/* Required Welcome and Trainer Name */}
+            {/* Welcome and Trainer Name */}
             <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
               Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">{trainerDisplay}</span>!
             </h1>
@@ -177,23 +175,18 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
           </div>
         </div>
 
-        {/* Database Table Missing Alert (if user hasn't executed SQL migration yet) */}
+        {/* Database Table Missing Alert */}
         {tableMissing && (
           <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-6 w-6 text-amber-400 shrink-0 mt-0.5" />
               <div>
                 <h3 className="text-lg font-bold text-amber-300">
-                  Setup Required: Supabase `workspaces` Table
+                  Supabase `workspaces` Table Setup
                 </h3>
                 <p className="text-sm text-amber-200/90 mt-1 leading-relaxed">
-                  The <code className="bg-amber-950/60 px-1.5 py-0.5 rounded text-amber-300">workspaces</code> table has not been created in your Supabase database yet. Please run the SQL migration script below in your Supabase Dashboard:
+                  Run the SQL migration script from <code className="bg-amber-950/60 px-1.5 py-0.5 rounded text-amber-300">supabase/schema.sql</code> in your Supabase SQL Editor.
                 </p>
-                <ol className="text-xs text-amber-200/80 mt-2 list-decimal list-inside space-y-1">
-                  <li>Open your <strong>Supabase Dashboard</strong> (project: <code className="bg-amber-950/60 px-1 py-0.5 rounded">qimrowpaebotfvtjizus</code>)</li>
-                  <li>Click on <strong>SQL Editor</strong> in the left sidebar</li>
-                  <li>Click <strong>New Query</strong>, paste the SQL below, and click <strong>Run</strong></li>
-                </ol>
               </div>
             </div>
 
@@ -221,11 +214,11 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
 
             <div className="flex justify-end">
               <button
-                onClick={fetchWorkspace}
+                onClick={() => fetchWorkspace(0)}
                 className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-lg text-xs flex items-center gap-2 transition cursor-pointer"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
-                I have run the SQL — Check Again
+                Check Again
               </button>
             </div>
           </div>
@@ -276,12 +269,13 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
                 </div>
               ) : (
                 <div className="py-4 text-center">
-                  <p className="text-sm text-slate-400">No workspace record found yet.</p>
+                  <p className="text-sm text-slate-400">Waiting for trigger to provision workspace...</p>
                   <button
-                    onClick={fetchWorkspace}
-                    className="mt-3 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs rounded-lg transition cursor-pointer"
+                    onClick={() => fetchWorkspace(0)}
+                    className="mt-3 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg transition cursor-pointer flex items-center gap-1.5 mx-auto"
                   >
-                    Provision Workspace Now
+                    <RefreshCw className="h-3 w-3" />
+                    Refresh Workspace
                   </button>
                 </div>
               )}
@@ -293,7 +287,7 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
                 User ID: {userId.substring(0, 8)}...
               </span>
               <button
-                onClick={fetchWorkspace}
+                onClick={() => fetchWorkspace(0)}
                 className="hover:text-slate-300 transition flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw className="h-3 w-3" />
@@ -324,7 +318,7 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
                 <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400">Total Workspaces visible to this session:</span>
-                    <span className="font-mono font-bold text-emerald-400">
+                    <span className="font-mono font-bold text-emerald-400 text-sm">
                       {allVisibleWorkspaces.length}
                     </span>
                   </div>
@@ -335,31 +329,31 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
 
                 <div className="text-xs text-slate-400 flex items-center gap-2 pt-1">
                   <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>Other trainers' workspaces are invisible to this account.</span>
+                  <span>Only your single assigned workspace is visible in this session.</span>
                 </div>
               </div>
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-500">
-              Policies active: SELECT, INSERT, UPDATE, DELETE for auth.uid()
+              Trigger-provisioned • 1 Workspace per Trainer
             </div>
           </div>
         </div>
 
-        {/* Quick Testing Instructions in Dashboard */}
+        {/* Verification Card */}
         <div className="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <UserCheck className="h-4 w-4 text-emerald-400" />
-            How to verify Row Level Security (RLS) isolation
+            Verification of Single Workspace
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-400">
             <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-              <strong className="text-slate-200 block mb-1">1. Test with Current Account:</strong>
-              Notice your trainer name and workspace ID above. The query returns exactly 1 workspace.
+              <strong className="text-slate-200 block mb-1">1. Single Workspace:</strong>
+              Total Workspaces visible to this session is exactly <strong>1</strong>.
             </div>
             <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-              <strong className="text-slate-200 block mb-1">2. Sign out and create Account #2:</strong>
-              Log in with a second trainer email. Account #2 will only see its own distinct workspace.
+              <strong className="text-slate-200 block mb-1">2. Trigger-Only Creation:</strong>
+              The database trigger alone provisions the workspace during signup, preventing duplicates.
             </div>
           </div>
         </div>
