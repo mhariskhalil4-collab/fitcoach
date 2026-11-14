@@ -15,7 +15,8 @@ import {
   Layers,
   Scale,
   Sparkles,
-  PieChart
+  PieChart,
+  Share2
 } from 'lucide-react'
 
 interface NutritionPlansManagerProps {
@@ -65,6 +66,7 @@ export default function NutritionPlansManager({ workspaceId, clients }: Nutritio
   const [planToDelete, setPlanToDelete] = useState<NutritionPlan | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [copiedSql, setCopiedSql] = useState(false)
+  const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null)
 
   // Fetch clients directly from Supabase for this workspace
   const fetchClients = useCallback(async () => {
@@ -140,6 +142,7 @@ export default function NutritionPlansManager({ workspaceId, clients }: Nutritio
           client_id,
           name,
           daily_calories,
+          share_token,
           created_at,
           client:clients (
             id,
@@ -206,6 +209,7 @@ export default function NutritionPlansManager({ workspaceId, clients }: Nutritio
           client_id: plan.client_id,
           name: plan.name,
           daily_calories: plan.daily_calories,
+          share_token: plan.share_token,
           created_at: plan.created_at,
           client: clientObj as unknown as Client,
           items: planItems,
@@ -231,6 +235,19 @@ export default function NutritionPlansManager({ workspaceId, clients }: Nutritio
     await fetchClients()
     setPreselectedClientId(clientId)
     setIsModalOpen(true)
+  }
+
+  // Copy public share link to clipboard
+  const handleSharePlan = (plan: NutritionPlan) => {
+    if (!plan.share_token) return
+    const shareUrl = `${window.location.origin}/p/${plan.share_token}`
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl)
+    }
+    setCopiedPlanId(plan.id)
+    setTimeout(() => {
+      setCopiedPlanId((current) => (current === plan.id ? null : current))
+    }, 2500)
   }
 
   // Delete plan
@@ -555,13 +572,37 @@ USING (plan_id IN (SELECT id FROM public.nutrition_plans WHERE workspace_id IN (
                       </h3>
                     </div>
 
-                    <button
-                      onClick={() => setPlanToDelete(plan)}
-                      className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 p-2 rounded-xl transition cursor-pointer"
-                      title="Delete nutrition plan"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => handleSharePlan(plan)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                          copiedPlanId === plan.id
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 hover:border-slate-600'
+                        }`}
+                        title="Copy public link to client's plan"
+                      >
+                        {copiedPlanId === plan.id ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-emerald-400 stroke-[2.5]" />
+                            <span className="text-emerald-400">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="h-3.5 w-3.5 text-emerald-400" />
+                            <span>Share</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => setPlanToDelete(plan)}
+                        className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 p-2 rounded-xl transition cursor-pointer"
+                        title="Delete nutrition plan"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Daily Calorie Target & Summary Banner */}

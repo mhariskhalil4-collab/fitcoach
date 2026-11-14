@@ -56,6 +56,7 @@ export interface WorkoutPlan {
   client_id: string
   name: string
   day: string
+  share_token?: string
   created_at: string
   client?: Client
   items?: (WorkoutPlanItem & { exercise?: Exercise })[]
@@ -88,9 +89,56 @@ export interface NutritionPlan {
   client_id: string
   name: string
   daily_calories: number
+  share_token?: string
   created_at: string
   client?: Client
   items?: (NutritionPlanItem & { meal?: Meal })[]
+}
+
+export interface PublicExerciseItem {
+  id?: string
+  name: string
+  muscle_group: string
+  equipment: string
+  instructions?: string | null
+  sets: number
+  reps: string
+}
+
+export interface PublicMealItem {
+  id?: string
+  name: string
+  meal_type: MealType
+  portion: string
+  calories: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+}
+
+export interface PublicPlanData {
+  client: {
+    id?: string
+    name: string
+    goal?: string
+    fitness_level?: string
+  }
+  workout_plan?: {
+    id: string
+    name: string
+    day: string
+    created_at?: string
+    share_token: string
+    exercises: PublicExerciseItem[]
+  } | null
+  nutrition_plan?: {
+    id: string
+    name: string
+    daily_calories: number
+    created_at?: string
+    share_token: string
+    meals: PublicMealItem[]
+  } | null
 }
 
 export interface AiGeneratedWorkoutPlan {

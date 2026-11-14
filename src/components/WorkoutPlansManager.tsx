@@ -12,7 +12,8 @@ import {
   RefreshCw, 
   Copy, 
   Check, 
-  Layers
+  Layers,
+  Share2
 } from 'lucide-react'
 
 interface WorkoutPlansManagerProps {
@@ -48,6 +49,7 @@ export default function WorkoutPlansManager({ workspaceId, clients }: WorkoutPla
   const [planToDelete, setPlanToDelete] = useState<WorkoutPlan | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [copiedSql, setCopiedSql] = useState(false)
+  const [copiedPlanId, setCopiedPlanId] = useState<string | null>(null)
 
   // Fetch clients directly from Supabase for this workspace
   const fetchClients = useCallback(async () => {
@@ -123,6 +125,7 @@ export default function WorkoutPlansManager({ workspaceId, clients }: WorkoutPla
           client_id,
           name,
           day,
+          share_token,
           created_at,
           client:clients (
             id,
@@ -187,6 +190,7 @@ export default function WorkoutPlansManager({ workspaceId, clients }: WorkoutPla
           client_id: p.client_id,
           name: p.name,
           day: p.day,
+          share_token: p.share_token,
           created_at: p.created_at,
           client: clientObj as Client,
           items: planItems,
@@ -208,6 +212,18 @@ export default function WorkoutPlansManager({ workspaceId, clients }: WorkoutPla
       fetchClients()
     }
   }, [workspaceId, fetchExercises, fetchPlans, fetchClients])
+
+  const handleSharePlan = (plan: WorkoutPlan) => {
+    if (!plan.share_token) return
+    const shareUrl = `${window.location.origin}/p/${plan.share_token}`
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl)
+    }
+    setCopiedPlanId(plan.id)
+    setTimeout(() => {
+      setCopiedPlanId((current) => (current === plan.id ? null : current))
+    }, 2500)
+  }
 
   const handleDeletePlan = async () => {
     if (!planToDelete) return
@@ -481,13 +497,37 @@ CREATE POLICY "Trainers can delete workout plan items in their workspace" ON pub
                     <h3 className="text-xl font-bold text-white tracking-tight">{plan.name}</h3>
                   </div>
 
-                  <button
-                    onClick={() => setPlanToDelete(plan)}
-                    className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
-                    title="Delete Workout Plan"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => handleSharePlan(plan)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                        copiedPlanId === plan.id
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 hover:border-slate-600'
+                      }`}
+                      title="Copy public link to client's plan"
+                    >
+                      {copiedPlanId === plan.id ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-400 stroke-[2.5]" />
+                          <span className="text-emerald-400">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="h-3.5 w-3.5 text-emerald-400" />
+                          <span>Share</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setPlanToDelete(plan)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                      title="Delete Workout Plan"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Exercises List inside Plan */}

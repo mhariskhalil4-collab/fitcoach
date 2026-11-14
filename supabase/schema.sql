@@ -166,8 +166,11 @@ CREATE TABLE IF NOT EXISTS public.workout_plans (
     client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     day TEXT NOT NULL,
+    share_token TEXT NOT NULL DEFAULT encode(gen_random_bytes(12), 'hex'),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_plans_share_token ON public.workout_plans(share_token);
 
 -- Enable RLS on workout_plans
 ALTER TABLE public.workout_plans ENABLE ROW LEVEL SECURITY;
@@ -303,12 +306,14 @@ CREATE TABLE IF NOT EXISTS public.nutrition_plans (
     client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     daily_calories INTEGER NOT NULL,
+    share_token TEXT NOT NULL DEFAULT encode(gen_random_bytes(12), 'hex'),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Indexes for foreign keys
+-- Indexes for foreign keys & share token
 CREATE INDEX IF NOT EXISTS idx_nutrition_plans_workspace_id ON public.nutrition_plans(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_nutrition_plans_client_id ON public.nutrition_plans(client_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nutrition_plans_share_token ON public.nutrition_plans(share_token);
 
 -- Enable RLS on nutrition_plans
 ALTER TABLE public.nutrition_plans ENABLE ROW LEVEL SECURITY;

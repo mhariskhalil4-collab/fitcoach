@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import AuthCard from './components/AuthCard'
 import Dashboard from './components/Dashboard'
+import PublicPlanView from './components/PublicPlanView'
 import { 
   Dumbbell, 
   Salad, 
@@ -14,6 +15,13 @@ import {
 } from 'lucide-react'
 
 export default function App() {
+  // 0. Public share route: /p/[token] accessible without login
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
+  const publicPlanMatch = pathname.match(/^\/p\/([a-zA-Z0-9_-]+)/)
+  if (publicPlanMatch) {
+    return <PublicPlanView token={publicPlanMatch[1]} />
+  }
+
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [authView, setAuthView] = useState<'home' | 'login' | 'signup'>('home')
