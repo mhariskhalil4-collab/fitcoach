@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase, type Client, type ClientGoal, type FitnessLevel } from '../lib/supabase'
 import { X, User, Target, Activity, Scale, Ruler, FileText, AlertCircle, Check } from 'lucide-react'
 
@@ -17,20 +17,54 @@ export default function ClientFormModal({
   onClose,
   onSaved,
 }: ClientFormModalProps) {
-  const [name, setName] = useState(clientToEdit?.name || '')
-  const [age, setAge] = useState<string>(clientToEdit?.age ? String(clientToEdit.age) : '')
-  const [gender, setGender] = useState(clientToEdit?.gender || 'Female')
-  const [goal, setGoal] = useState<ClientGoal>(clientToEdit?.goal || 'lose weight')
-  const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel>(clientToEdit?.fitness_level || 'beginner')
-  const [weightKg, setWeightKg] = useState<string>(
-    clientToEdit?.weight_kg ? String(clientToEdit.weight_kg) : ''
-  )
-  const [heightCm, setHeightCm] = useState<string>(
-    clientToEdit?.height_cm ? String(clientToEdit.height_cm) : ''
-  )
-  const [notes, setNotes] = useState(clientToEdit?.notes || '')
+  const [name, setName] = useState('')
+  const [age, setAge] = useState<string>('')
+  const [gender, setGender] = useState('Female')
+  const [goal, setGoal] = useState<ClientGoal>('lose weight')
+  const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel>('beginner')
+  const [weightKg, setWeightKg] = useState<string>('')
+  const [heightCm, setHeightCm] = useState<string>('')
+  const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Reset and populate form fields whenever clientToEdit or isOpen changes
+  useEffect(() => {
+    if (isOpen) {
+      if (clientToEdit) {
+        setName(clientToEdit.name || '')
+        setAge(
+          clientToEdit.age !== null && clientToEdit.age !== undefined
+            ? String(clientToEdit.age)
+            : ''
+        )
+        setGender(clientToEdit.gender || 'Female')
+        setGoal(clientToEdit.goal || 'lose weight')
+        setFitnessLevel(clientToEdit.fitness_level || 'beginner')
+        setWeightKg(
+          clientToEdit.weight_kg !== null && clientToEdit.weight_kg !== undefined
+            ? String(clientToEdit.weight_kg)
+            : ''
+        )
+        setHeightCm(
+          clientToEdit.height_cm !== null && clientToEdit.height_cm !== undefined
+            ? String(clientToEdit.height_cm)
+            : ''
+        )
+        setNotes(clientToEdit.notes || '')
+      } else {
+        setName('')
+        setAge('')
+        setGender('Female')
+        setGoal('lose weight')
+        setFitnessLevel('beginner')
+        setWeightKg('')
+        setHeightCm('')
+        setNotes('')
+      }
+      setError(null)
+    }
+  }, [clientToEdit, isOpen])
 
   if (!isOpen) return null
 

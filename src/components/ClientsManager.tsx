@@ -515,16 +515,19 @@ USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = auth.ui
       )}
 
       {/* Add / Edit Modal */}
-      <ClientFormModal
-        workspaceId={workspaceId}
-        clientToEdit={clientToEdit}
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setClientToEdit(null)
-        }}
-        onSaved={fetchClients}
-      />
+      {isModalOpen && (
+        <ClientFormModal
+          key={clientToEdit ? `edit-${clientToEdit.id}` : 'add-client'}
+          workspaceId={workspaceId}
+          clientToEdit={clientToEdit}
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false)
+            setClientToEdit(null)
+          }}
+          onSaved={fetchClients}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       {clientToDelete && (
