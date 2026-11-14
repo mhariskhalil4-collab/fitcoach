@@ -17,7 +17,7 @@ interface RequestBody {
 }
 
 Deno.serve(async (req: Request) => {
-  // Handle CORS preflight
+  // 1. Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
@@ -32,28 +32,49 @@ Deno.serve(async (req: Request) => {
   try {
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) {
+      console.error("[generate-plan] Missing Authorization header")
       return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
     }
 
-    const { client_id, goal } = (await req.json()) as RequestBody
+    const body = (await req.json()) as RequestBody
+    const { client_id, goal } = body
+
     if (!client_id) {
+      console.error("[generate-plan] Missing client_id in request body")
       return new Response(JSON.stringify({ error: "client_id is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
     }
 
-    // Initialize authenticated Supabase client using user's bearer token
+    // 2. Initialize Supabase admin client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    })
+    const supabaseKey =
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
+      Deno.env.get("SUPABASE_ANON_KEY") ??
+      ""
 
-    // 1. Fetch client data from Supabase
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // 3. Authenticate requesting user token
+    const token = authHeader.replace(/^Bearer\s+/i, "")
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token)
+
+    if (userError || !user) {
+      console.error("[generate-plan] Invalid or expired user session:", userError)
+      return new Response(JSON.stringify({ error: "Invalid or expired session. Please log in again." }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+
+    // 4. Fetch target client
     const { data: client, error: clientError } = await supabase
       .from("clients")
       .select("*")
@@ -61,8 +82,9 @@ Deno.serve(async (req: Request) => {
       .single()
 
     if (clientError || !client) {
+      console.error("[generate-plan] Client fetch failed:", clientError)
       return new Response(
-        JSON.stringify({ error: "Client not found or access denied", details: clientError }),
+        JSON.stringify({ error: "Client not found or inaccessible", details: clientError }),
         {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -70,9 +92,28 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // 5. Verify user owns the workspace of this client
+    const { data: ws, error: wsError } = await supabase
+      .from("workspaces")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("id", client.workspace_id)
+      .maybeSingle()
+
+    if (wsError || !ws) {
+      console.error("[generate-plan] Unauthorized workspace access attempt for user:", user.id)
+      return new Response(
+        JSON.stringify({ error: "You do not have access to this client's workspace." }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      )
+    }
+
     const effectiveGoal = goal || client.goal || "get fit"
 
-    // 2. Enforce monthly limit (5 AI plans per workspace per month)
+    // 6. Enforce monthly limit (5 AI plans per workspace per month)
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
@@ -82,10 +123,15 @@ Deno.serve(async (req: Request) => {
       .eq("workspace_id", client.workspace_id)
       .gte("created_at", startOfMonth)
 
+    if (countError) {
+      console.warn("[generate-plan] Could not query ai_plan_generations:", countError)
+    }
+
     const usedCount = count ?? 0
     const MONTHLY_LIMIT = 5
 
     if (usedCount >= MONTHLY_LIMIT) {
+      console.warn(`[generate-plan] Workspace ${client.workspace_id} reached monthly limit (${usedCount}/${MONTHLY_LIMIT})`)
       return new Response(
         JSON.stringify({
           error: `Monthly AI plan generation limit reached (${usedCount}/${MONTHLY_LIMIT}). Your limit resets on the 1st of next month.`,
@@ -102,9 +148,10 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // 3. Verify Gemini API key is present in Edge Function environment
+    // 7. Verify Gemini API key is configured
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY")
     if (!geminiApiKey) {
+      console.error("[generate-plan] GEMINI_API_KEY secret is missing")
       return new Response(
         JSON.stringify({
           error:
@@ -117,7 +164,7 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // 4. Construct prompt for Gemini
+    // 8. Construct structured prompt
     const systemPrompt = `You are an elite certified personal fitness trainer and sports nutritionist.
 Create a personalized, science-based workout plan and a daily nutrition plan tailored to the client's profile and goal.
 Return ONLY a valid, raw JSON object (strictly adhering to the schema below without markdown backticks, without code fences):
@@ -165,13 +212,19 @@ Requirements:
 1. Workout plan must include 4 distinct exercises suitable for their ${client.fitness_level} level and ${effectiveGoal} goal (e.g., Squat, Push-up, Lunge, Plank, Pull-up, Bench Press, Deadlift, Overhead Press).
 2. Nutrition plan must include 4 meals covering: breakfast, lunch, dinner, snack with realistic portion, calories, protein_g, carbs_g, fat_g, adding up closely to the daily_calories target.`
 
-    // 5. Call Gemini API
-    const modelsToTry = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"]
+    // 9. Call Gemini API using current stable models
+    const modelsToTry = [
+      "gemini-3.5-flash-lite",
+      "gemini-3.5-flash",
+      "gemini-3.8-flash"
+    ]
+
     let generatedRawText = ""
     let lastError: Error | null = null
 
     for (const model of modelsToTry) {
       try {
+        console.log(`[generate-plan] Calling Gemini API model: ${model}`)
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`
         const geminiRes = await fetch(url, {
           method: "POST",
@@ -192,15 +245,18 @@ Requirements:
 
         if (!geminiRes.ok) {
           const errBody = await geminiRes.text()
+          console.warn(`[generate-plan] Model ${model} returned HTTP ${geminiRes.status}: ${errBody}`)
           throw new Error(`Gemini API error (${model} - HTTP ${geminiRes.status}): ${errBody}`)
         }
 
         const data = await geminiRes.json()
         generatedRawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
-        if (generatedRawText) break
+        if (generatedRawText) {
+          console.log(`[generate-plan] Successfully generated content using ${model}`)
+          break
+        }
       } catch (err: unknown) {
         lastError = err instanceof Error ? err : new Error(String(err))
-        console.warn(`Model ${model} failed, trying next fallback...`, err)
       }
     }
 
@@ -208,7 +264,7 @@ Requirements:
       throw lastError || new Error("Failed to receive a valid generation from Gemini API.")
     }
 
-    // Clean any accidental markdown wrappers
+    // Clean markdown fences if any were included
     let cleanJson = generatedRawText.trim()
     if (cleanJson.startsWith("```json")) {
       cleanJson = cleanJson.replace(/^```json\s*/i, "").replace(/```$/, "").trim()
@@ -218,7 +274,7 @@ Requirements:
 
     const parsedPlan = JSON.parse(cleanJson)
 
-    // 6. Record usage in public.ai_plan_generations
+    // 10. Record usage in public.ai_plan_generations
     try {
       await supabase.from("ai_plan_generations").insert({
         workspace_id: client.workspace_id,
@@ -229,7 +285,7 @@ Requirements:
         rationale: parsedPlan.rationale,
       })
     } catch (saveErr) {
-      console.error("Error saving generation record:", saveErr)
+      console.error("[generate-plan] Error recording AI generation history:", saveErr)
     }
 
     const updatedRemaining = Math.max(0, MONTHLY_LIMIT - (usedCount + 1))
@@ -258,6 +314,7 @@ Requirements:
     )
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal Server Error"
+    console.error("[generate-plan] Unhandled error:", err)
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
