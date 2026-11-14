@@ -19,16 +19,16 @@ export default function ClientFormModal({
 }: ClientFormModalProps) {
   const [name, setName] = useState('')
   const [age, setAge] = useState<string>('')
-  const [gender, setGender] = useState('Female')
-  const [goal, setGoal] = useState<ClientGoal>('lose weight')
-  const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel>('beginner')
+  const [gender, setGender] = useState<string>('')
+  const [goal, setGoal] = useState<ClientGoal | ''>('')
+  const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel | ''>('')
   const [weightKg, setWeightKg] = useState<string>('')
   const [heightCm, setHeightCm] = useState<string>('')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Reset and populate form fields whenever clientToEdit or isOpen changes
+  // Explicitly reset all fields when adding a new client, or populate with clientToEdit
   useEffect(() => {
     if (isOpen) {
       if (clientToEdit) {
@@ -38,9 +38,9 @@ export default function ClientFormModal({
             ? String(clientToEdit.age)
             : ''
         )
-        setGender(clientToEdit.gender || 'Female')
-        setGoal(clientToEdit.goal || 'lose weight')
-        setFitnessLevel(clientToEdit.fitness_level || 'beginner')
+        setGender(clientToEdit.gender || '')
+        setGoal(clientToEdit.goal || '')
+        setFitnessLevel(clientToEdit.fitness_level || '')
         setWeightKg(
           clientToEdit.weight_kg !== null && clientToEdit.weight_kg !== undefined
             ? String(clientToEdit.weight_kg)
@@ -53,11 +53,12 @@ export default function ClientFormModal({
         )
         setNotes(clientToEdit.notes || '')
       } else {
+        // Must open completely blank for new client
         setName('')
         setAge('')
-        setGender('Female')
-        setGoal('lose weight')
-        setFitnessLevel('beginner')
+        setGender('')
+        setGoal('')
+        setFitnessLevel('')
         setWeightKg('')
         setHeightCm('')
         setNotes('')
@@ -76,12 +77,20 @@ export default function ClientFormModal({
     setLoading(true)
 
     try {
-      const parsedAge = age ? parseInt(age, 10) : null
-      const parsedWeight = weightKg ? parseFloat(weightKg) : null
-      const parsedHeight = heightCm ? parseFloat(heightCm) : null
+      const parsedAge = age.trim() ? parseInt(age, 10) : null
+      const parsedWeight = weightKg.trim() ? parseFloat(weightKg) : null
+      const parsedHeight = heightCm.trim() ? parseFloat(heightCm) : null
 
       if (!name.trim()) {
         throw new Error('Client name is required.')
+      }
+
+      if (!goal) {
+        throw new Error('Please select a goal (lose weight, build muscle, or get fit).')
+      }
+
+      if (!fitnessLevel) {
+        throw new Error('Please select a fitness level (beginner, intermediate, or advanced).')
       }
 
       if (isEditing && clientToEdit) {
@@ -90,9 +99,9 @@ export default function ClientFormModal({
           .update({
             name: name.trim(),
             age: parsedAge,
-            gender,
-            goal,
-            fitness_level: fitnessLevel,
+            gender: gender.trim() || null,
+            goal: goal as ClientGoal,
+            fitness_level: fitnessLevel as FitnessLevel,
             weight_kg: parsedWeight,
             height_cm: parsedHeight,
             notes: notes.trim() || null,
@@ -105,9 +114,9 @@ export default function ClientFormModal({
           workspace_id: workspaceId,
           name: name.trim(),
           age: parsedAge,
-          gender,
-          goal,
-          fitness_level: fitnessLevel,
+          gender: gender.trim() || null,
+          goal: goal as ClientGoal,
+          fitness_level: fitnessLevel as FitnessLevel,
           weight_kg: parsedWeight,
           height_cm: parsedHeight,
           notes: notes.trim() || null,
@@ -173,7 +182,7 @@ export default function ClientFormModal({
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Sara Jenkins"
+                placeholder="Enter client name"
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
               />
             </div>
@@ -191,7 +200,7 @@ export default function ClientFormModal({
                 max={120}
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
-                placeholder="28"
+                placeholder="Age in years"
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
               />
             </div>
@@ -203,12 +212,15 @@ export default function ClientFormModal({
               <select
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                className={`w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer ${
+                  gender ? 'text-white' : 'text-slate-500'
+                }`}
               >
-                <option value="Female">Female</option>
-                <option value="Male">Male</option>
-                <option value="Non-binary">Non-binary</option>
-                <option value="Other">Other</option>
+                <option value="">Select gender...</option>
+                <option value="Female" className="text-white bg-slate-900">Female</option>
+                <option value="Male" className="text-white bg-slate-900">Male</option>
+                <option value="Non-binary" className="text-white bg-slate-900">Non-binary</option>
+                <option value="Other" className="text-white bg-slate-900">Other</option>
               </select>
             </div>
           </div>
@@ -221,13 +233,17 @@ export default function ClientFormModal({
                 Goal *
               </label>
               <select
+                required
                 value={goal}
                 onChange={(e) => setGoal(e.target.value as ClientGoal)}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                className={`w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer ${
+                  goal ? 'text-white' : 'text-slate-500'
+                }`}
               >
-                <option value="lose weight">lose weight</option>
-                <option value="build muscle">build muscle</option>
-                <option value="get fit">get fit</option>
+                <option value="">Select primary goal...</option>
+                <option value="lose weight" className="text-white bg-slate-900">lose weight</option>
+                <option value="build muscle" className="text-white bg-slate-900">build muscle</option>
+                <option value="get fit" className="text-white bg-slate-900">get fit</option>
               </select>
             </div>
 
@@ -237,13 +253,17 @@ export default function ClientFormModal({
                 Fitness Level *
               </label>
               <select
+                required
                 value={fitnessLevel}
                 onChange={(e) => setFitnessLevel(e.target.value as FitnessLevel)}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                className={`w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer ${
+                  fitnessLevel ? 'text-white' : 'text-slate-500'
+                }`}
               >
-                <option value="beginner">beginner</option>
-                <option value="intermediate">intermediate</option>
-                <option value="advanced">advanced</option>
+                <option value="">Select fitness level...</option>
+                <option value="beginner" className="text-white bg-slate-900">beginner</option>
+                <option value="intermediate" className="text-white bg-slate-900">intermediate</option>
+                <option value="advanced" className="text-white bg-slate-900">advanced</option>
               </select>
             </div>
           </div>
@@ -262,7 +282,7 @@ export default function ClientFormModal({
                 max={300}
                 value={weightKg}
                 onChange={(e) => setWeightKg(e.target.value)}
-                placeholder="68.0"
+                placeholder="Weight in kg"
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
               />
             </div>
@@ -279,7 +299,7 @@ export default function ClientFormModal({
                 max={250}
                 value={heightCm}
                 onChange={(e) => setHeightCm(e.target.value)}
-                placeholder="165"
+                placeholder="Height in cm"
                 className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
               />
             </div>
@@ -295,7 +315,7 @@ export default function ClientFormModal({
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Schedule constraints, diet preferences, injuries..."
+              placeholder="Add any coach notes, health restrictions, or diet targets..."
               className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition resize-none"
             />
           </div>
