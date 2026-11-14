@@ -1,0 +1,298 @@
+import React, { useState } from 'react'
+import { supabase, type Client, type ClientGoal, type FitnessLevel } from '../lib/supabase'
+import { X, User, Target, Activity, Scale, Ruler, FileText, AlertCircle, Check } from 'lucide-react'
+
+interface ClientFormModalProps {
+  workspaceId: string
+  clientToEdit?: Client | null
+  isOpen: boolean
+  onClose: () => void
+  onSaved: () => void
+}
+
+export default function ClientFormModal({
+  workspaceId,
+  clientToEdit,
+  isOpen,
+  onClose,
+  onSaved,
+}: ClientFormModalProps) {
+  const [name, setName] = useState(clientToEdit?.name || '')
+  const [age, setAge] = useState<string>(clientToEdit?.age ? String(clientToEdit.age) : '')
+  const [gender, setGender] = useState(clientToEdit?.gender || 'Female')
+  const [goal, setGoal] = useState<ClientGoal>(clientToEdit?.goal || 'lose weight')
+  const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel>(clientToEdit?.fitness_level || 'beginner')
+  const [weightKg, setWeightKg] = useState<string>(
+    clientToEdit?.weight_kg ? String(clientToEdit.weight_kg) : ''
+  )
+  const [heightCm, setHeightCm] = useState<string>(
+    clientToEdit?.height_cm ? String(clientToEdit.height_cm) : ''
+  )
+  const [notes, setNotes] = useState(clientToEdit?.notes || '')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!isOpen) return null
+
+  const isEditing = Boolean(clientToEdit)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+
+    try {
+      const parsedAge = age ? parseInt(age, 10) : null
+      const parsedWeight = weightKg ? parseFloat(weightKg) : null
+      const parsedHeight = heightCm ? parseFloat(heightCm) : null
+
+      if (!name.trim()) {
+        throw new Error('Client name is required.')
+      }
+
+      if (isEditing && clientToEdit) {
+        const { error: updateError } = await supabase
+          .from('clients')
+          .update({
+            name: name.trim(),
+            age: parsedAge,
+            gender,
+            goal,
+            fitness_level: fitnessLevel,
+            weight_kg: parsedWeight,
+            height_cm: parsedHeight,
+            notes: notes.trim() || null,
+          })
+          .eq('id', clientToEdit.id)
+
+        if (updateError) throw updateError
+      } else {
+        const { error: insertError } = await supabase.from('clients').insert({
+          workspace_id: workspaceId,
+          name: name.trim(),
+          age: parsedAge,
+          gender,
+          goal,
+          fitness_level: fitnessLevel,
+          weight_kg: parsedWeight,
+          height_cm: parsedHeight,
+          notes: notes.trim() || null,
+        })
+
+        if (insertError) throw insertError
+      }
+
+      onSaved()
+      onClose()
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('Failed to save client details.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative my-8">
+        <button
+          onClick={onClose}
+          className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition cursor-pointer"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="mb-6">
+          <div className="inline-flex h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 items-center justify-center text-emerald-400 mb-2">
+            <User className="h-5 w-5" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            {isEditing ? 'Edit Client Profile' : 'Add New Client'}
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            {isEditing
+              ? `Updating fitness details for ${clientToEdit?.name}`
+              : 'Add an athlete to your workspace roster'}
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Full Name */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              Client Name *
+            </label>
+            <div className="relative">
+              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Sara Jenkins"
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+              />
+            </div>
+          </div>
+
+          {/* Age & Gender */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Age
+              </label>
+              <input
+                type="number"
+                min={10}
+                max={120}
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                placeholder="28"
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                Gender
+              </label>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+              >
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="Non-binary">Non-binary</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Goal & Fitness Level */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Target className="h-3.5 w-3.5 text-emerald-400" />
+                Goal *
+              </label>
+              <select
+                value={goal}
+                onChange={(e) => setGoal(e.target.value as ClientGoal)}
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+              >
+                <option value="lose weight">lose weight</option>
+                <option value="build muscle">build muscle</option>
+                <option value="get fit">get fit</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Activity className="h-3.5 w-3.5 text-teal-400" />
+                Fitness Level *
+              </label>
+              <select
+                value={fitnessLevel}
+                onChange={(e) => setFitnessLevel(e.target.value as FitnessLevel)}
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+              >
+                <option value="beginner">beginner</option>
+                <option value="intermediate">intermediate</option>
+                <option value="advanced">advanced</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Weight & Height */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Scale className="h-3.5 w-3.5 text-slate-400" />
+                Weight (kg)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min={20}
+                max={300}
+                value={weightKg}
+                onChange={(e) => setWeightKg(e.target.value)}
+                placeholder="68.0"
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Ruler className="h-3.5 w-3.5 text-slate-400" />
+                Height (cm)
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                min={50}
+                max={250}
+                value={heightCm}
+                onChange={(e) => setHeightCm(e.target.value)}
+                placeholder="165"
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+              />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5 text-slate-400" />
+              Coach Notes
+            </label>
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Schedule constraints, diet preferences, injuries..."
+              className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition resize-none"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800/80">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="px-4 py-2.5 rounded-xl border border-slate-800 hover:bg-slate-800 text-slate-300 text-sm font-medium transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 disabled:opacity-50 text-slate-950 text-sm font-semibold rounded-xl shadow-lg shadow-emerald-500/20 transition flex items-center gap-2 cursor-pointer"
+            >
+              {loading ? (
+                <span className="inline-block h-4 w-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></span>
+              ) : (
+                <>
+                  <Check className="h-4 w-4" />
+                  <span>{isEditing ? 'Save Changes' : 'Create Client'}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
