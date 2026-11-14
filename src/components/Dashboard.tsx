@@ -3,9 +3,11 @@ import { supabase, type Workspace, type Client } from '../lib/supabase'
 import ClientsManager from './ClientsManager'
 import WorkoutPlansManager from './WorkoutPlansManager'
 import NutritionPlansManager from './NutritionPlansManager'
+import AiCoachManager from './AiCoachManager'
 import { 
   Dumbbell, 
   Utensils,
+  Sparkles,
   LogOut, 
   ShieldCheck, 
   Database, 
@@ -25,7 +27,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onSignOut }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'plans' | 'nutrition' | 'clients' | 'overview'>('plans')
+  const [activeTab, setActiveTab] = useState<'plans' | 'nutrition' | 'aicoach' | 'clients' | 'overview'>('plans')
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [allVisibleWorkspaces, setAllVisibleWorkspaces] = useState<Workspace[]>([])
@@ -225,6 +227,17 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
             <span>Nutrition Plans</span>
           </button>
           <button
+            onClick={() => setActiveTab('aicoach')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 cursor-pointer ${
+              activeTab === 'aicoach'
+                ? 'bg-gradient-to-r from-fuchsia-500 to-indigo-500 text-white shadow-md shadow-fuchsia-500/25'
+                : 'text-fuchsia-400/90 hover:text-fuchsia-300 bg-fuchsia-500/5 hover:bg-fuchsia-500/10 border border-fuchsia-500/20'
+            }`}
+          >
+            <Sparkles className="h-4 w-4" />
+            <span>AI Coach</span>
+          </button>
+          <button
             onClick={() => setActiveTab('clients')}
             className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'clients'
@@ -313,7 +326,16 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
           />
         )}
 
-        {/* Tab 3: Clients Page */}
+        {/* Tab 3: AI Coach Page */}
+        {activeTab === 'aicoach' && workspace && (
+          <AiCoachManager
+            workspaceId={workspace.id}
+            clients={clients}
+            onNavigateTab={setActiveTab}
+          />
+        )}
+
+        {/* Tab 4: Clients Page */}
         {activeTab === 'clients' && workspace && (
           <ClientsManager
             workspaceId={workspace.id}

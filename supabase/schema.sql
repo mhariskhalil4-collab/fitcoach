@@ -392,3 +392,43 @@ USING (
     WHERE workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid()))
   )
 );
+
+-- =========================================================================
+-- 9. AI PLAN GENERATIONS TABLE & USAGE LIMIT TRACKING (5 / month)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.ai_plan_generations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+    client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+    goal TEXT NOT NULL,
+    workout_plan JSONB NOT NULL,
+    nutrition_plan JSONB NOT NULL,
+    rationale TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Indexes for performance & monthly usage queries
+CREATE INDEX IF NOT EXISTS idx_ai_plan_generations_workspace_date 
+ON public.ai_plan_generations(workspace_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_ai_plan_generations_client_id 
+ON public.ai_plan_generations(client_id);
+
+-- Enable RLS on ai_plan_generations
+ALTER TABLE public.ai_plan_generations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Trainers can view their workspace ai generations" ON public.ai_plan_generations;
+DROP POLICY IF EXISTS "Trainers can insert their workspace ai generations" ON public.ai_plan_generations;
+DROP POLICY IF EXISTS "Trainers can delete their workspace ai generations" ON public.ai_plan_generations;
+
+CREATE POLICY "Trainers can view their workspace ai generations"
+ON public.ai_plan_generations FOR SELECT
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can insert their workspace ai generations"
+ON public.ai_plan_generations FOR INSERT
+WITH CHECK (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));
+
+CREATE POLICY "Trainers can delete their workspace ai generations"
+ON public.ai_plan_generations FOR DELETE
+USING (workspace_id IN (SELECT id FROM public.workspaces WHERE user_id = (SELECT auth.uid())));

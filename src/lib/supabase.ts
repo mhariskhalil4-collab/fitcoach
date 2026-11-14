@@ -92,3 +92,55 @@ export interface NutritionPlan {
   client?: Client
   items?: (NutritionPlanItem & { meal?: Meal })[]
 }
+
+export interface AiGeneratedWorkoutPlan {
+  name: string
+  day: string
+  exercises: {
+    name: string
+    sets: number
+    reps: string
+  }[]
+}
+
+export interface AiGeneratedNutritionPlan {
+  name: string
+  daily_calories: number
+  meals: {
+    name: string
+    meal_type: MealType
+    portion: string
+    calories: number
+    protein_g: number
+    carbs_g: number
+    fat_g: number
+  }[]
+}
+
+export interface AiPlanGenerationResult {
+  rationale: string
+  workout_plan: AiGeneratedWorkoutPlan
+  nutrition_plan: AiGeneratedNutritionPlan
+  client?: {
+    id: string
+    name: string
+    goal: string
+    fitness_level: string
+  }
+  usage?: {
+    used: number
+    limit: number
+    remaining: number
+  }
+}
+
+export interface AiPlanGenerationRecord {
+  id: string
+  workspace_id: string
+  client_id: string
+  goal: string
+  workout_plan: AiGeneratedWorkoutPlan
+  nutrition_plan: AiGeneratedNutritionPlan
+  rationale: string | null
+  created_at: string
+}
