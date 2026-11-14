@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, type Workspace } from '../lib/supabase'
 import ClientsManager from './ClientsManager'
+import WorkoutPlansManager from './WorkoutPlansManager'
 import { 
   Dumbbell, 
   LogOut, 
@@ -22,7 +23,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onSignOut }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'clients' | 'overview'>('clients')
+  const [activeTab, setActiveTab] = useState<'plans' | 'clients' | 'overview'>('plans')
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [allVisibleWorkspaces, setAllVisibleWorkspaces] = useState<Workspace[]>([])
   const [loading, setLoading] = useState(true)
@@ -185,6 +186,17 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
         {/* View Switcher Tabs */}
         <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 p-1.5 rounded-2xl w-fit">
           <button
+            onClick={() => setActiveTab('plans')}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 cursor-pointer ${
+              activeTab === 'plans'
+                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Dumbbell className="h-4 w-4" />
+            <span>Workout Plans</span>
+          </button>
+          <button
             onClick={() => setActiveTab('clients')}
             className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 cursor-pointer ${
               activeTab === 'clients'
@@ -257,12 +269,17 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
           </div>
         )}
 
-        {/* Tab 1: Clients Page */}
+        {/* Tab 1: Workout Plans Page */}
+        {activeTab === 'plans' && workspace && (
+          <WorkoutPlansManager workspaceId={workspace.id} />
+        )}
+
+        {/* Tab 2: Clients Page */}
         {activeTab === 'clients' && workspace && (
           <ClientsManager workspaceId={workspace.id} trainerName={trainerDisplay} />
         )}
 
-        {/* Tab 2: Overview & Security */}
+        {/* Tab 3: Overview & Security */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

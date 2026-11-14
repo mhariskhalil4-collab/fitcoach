@@ -32,3 +32,31 @@ export interface Client {
   notes: string | null
   created_at: string
 }
+
+export interface Exercise {
+  id: string
+  name: string
+  muscle_group: string
+  equipment: string
+  instructions: string | null
+}
+
+export interface WorkoutPlanItem {
+  id?: string
+  plan_id?: string
+  exercise_id: string
+  sets: number
+  reps: string
+  exercise?: Exercise
+}
+
+export interface WorkoutPlan {
+  id: string
+  workspace_id: string
+  client_id: string
+  name: string
+  day: string
+  created_at: string
+  client?: Client
+  items?: (WorkoutPlanItem & { exercise?: Exercise })[]
+}
