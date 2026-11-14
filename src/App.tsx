@@ -1,15 +1,104 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { supabase } from './lib/supabase'
+import AuthCard from './components/AuthCard'
+import Dashboard from './components/Dashboard'
 import { 
   Dumbbell, 
   Salad, 
   Users, 
   ArrowRight,
-  Sparkles
+  Sparkles,
+  LogIn,
+  UserPlus
 } from 'lucide-react'
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'workouts' | 'nutrition'>('overview')
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [authView, setAuthView] = useState<'home' | 'login' | 'signup'>('home')
 
+  useEffect(() => {
+    // 1. Check active session on initial mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setLoading(false)
+    })
+
+    // 2. Listen for auth changes (sign in, sign out, token refresh)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setLoading(false)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    setAuthView('home')
+  }
+
+  // Loading state while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center animate-pulse shadow-lg shadow-emerald-500/20">
+            <Dumbbell className="h-5 w-5 text-slate-950 stroke-[2.5]" />
+          </div>
+          <p className="text-sm text-slate-400 font-medium">Loading FitCoach...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If user is logged in, show the Trainer Dashboard
+  if (session) {
+    return <Dashboard onSignOut={handleSignOut} />
+  }
+
+  // If user navigated to Login or Sign-up view
+  if (authView === 'login' || authView === 'signup') {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-emerald-500 selection:text-slate-950">
+        <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <button
+              onClick={() => setAuthView('home')}
+              className="flex items-center gap-3 cursor-pointer hover:opacity-90 transition"
+            >
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <Dumbbell className="h-5 w-5 text-slate-950 stroke-[2.5]" />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-white">FitCoach</span>
+            </button>
+
+            <button
+              onClick={() => setAuthView('home')}
+              className="text-xs text-slate-400 hover:text-white transition px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 cursor-pointer"
+            >
+              ← Back to Overview
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center px-4 py-12">
+          <AuthCard initialMode={authView} />
+        </main>
+
+        <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">
+          FitCoach • Workout and nutrition coach for personal trainers.
+        </footer>
+      </div>
+    )
+  }
+
+  // Default Landing / Home Page view
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-slate-950">
       {/* Navigation */}
@@ -22,46 +111,20 @@ export default function App() {
             <span className="text-xl font-bold tracking-tight text-white">FitCoach</span>
           </div>
 
-          <div className="hidden md:flex items-center gap-1 bg-slate-900/90 border border-slate-800 p-1 rounded-lg">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                activeTab === 'overview'
-                  ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab('workouts')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                activeTab === 'workouts'
-                  ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Workouts
-            </button>
-            <button
-              onClick={() => setActiveTab('nutrition')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                activeTab === 'nutrition'
-                  ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Nutrition
-            </button>
-          </div>
-
           <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Ready
-            </span>
-            <button className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-sm font-semibold transition shadow-md shadow-emerald-500/20 cursor-pointer">
-              Get Started
+            <button
+              onClick={() => setAuthView('login')}
+              className="px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              Sign In
+            </button>
+            <button
+              onClick={() => setAuthView('signup')}
+              className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-semibold transition shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Sign Up
             </button>
           </div>
         </div>
@@ -89,12 +152,18 @@ export default function App() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <button className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-semibold rounded-xl text-base shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition group cursor-pointer">
+            <button
+              onClick={() => setAuthView('signup')}
+              className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-semibold rounded-xl text-base shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition group cursor-pointer"
+            >
               Start Free Trial
               <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
             </button>
-            <button className="w-full sm:w-auto px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-slate-700 font-medium rounded-xl text-base transition flex items-center justify-center gap-2 cursor-pointer">
-              Explore Demo
+            <button
+              onClick={() => setAuthView('login')}
+              className="w-full sm:w-auto px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 hover:border-slate-700 font-medium rounded-xl text-base transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              Sign In to Workspace
             </button>
           </div>
         </div>
