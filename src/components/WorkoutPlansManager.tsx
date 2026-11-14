@@ -38,7 +38,7 @@ const CORE_12_EXERCISES = [
 export default function WorkoutPlansManager({ workspaceId, clients }: WorkoutPlansManagerProps) {
   const [plans, setPlans] = useState<WorkoutPlan[]>([])
   const [exercises, setExercises] = useState<Exercise[]>([])
-  const [internalClients, setInternalClients] = useState<Client[]>(clients || [])
+  const [clientsList, setClientsList] = useState<Client[]>(clients || [])
   const [loading, setLoading] = useState(true)
   const [tableMissing, setTableMissing] = useState(false)
   const [selectedClientFilter, setSelectedClientFilter] = useState('all')
@@ -49,20 +49,32 @@ export default function WorkoutPlansManager({ workspaceId, clients }: WorkoutPla
   const [isDeleting, setIsDeleting] = useState(false)
   const [copiedSql, setCopiedSql] = useState(false)
 
-  const fetchInternalClients = useCallback(async () => {
+  // Fetch clients directly from Supabase for this workspace
+  const fetchClients = useCallback(async () => {
+    if (!workspaceId) return
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('clients')
         .select('*')
         .eq('workspace_id', workspaceId)
-        .order('name')
-      if (data) setInternalClients(data)
+        .order('name', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching clients for workout plans:', error)
+        return
+      }
+      setClientsList(data || [])
     } catch (err) {
       console.error('Error fetching clients for workout plans:', err)
     }
   }, [workspaceId])
 
-  const activeClients = clients && clients.length > 0 ? clients : internalClients
+  // Sync if prop changes
+  useEffect(() => {
+    if (clients && clients.length > 0) {
+      setClientsList(clients)
+    }
+  }, [clients])
 
   // Seed 12 exercises if table is empty
   const seedExercises = useCallback(async () => {
@@ -193,8 +205,9 @@ export default function WorkoutPlansManager({ workspaceId, clients }: WorkoutPla
     fetchExercises()
     if (workspaceId) {
       fetchPlans()
+      fetchClients()
     }
-  }, [workspaceId, fetchExercises, fetchPlans])
+  }, [workspaceId, fetchExercises, fetchPlans, fetchClients])
 
   const handleDeletePlan = async () => {
     if (!planToDelete) return
@@ -295,6 +308,12 @@ CREATE POLICY "Trainers can delete workout plan items in their workspace" ON pub
     setTimeout(() => setCopiedSql(false), 2500)
   }
 
+  const handleOpenCreateModal = async () => {
+    await fetchClients()
+    setPreselectedClientId(undefined)
+    setIsModalOpen(true)
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Header Card */}
@@ -312,11 +331,8 @@ CREATE POLICY "Trainers can delete workout plan items in their workspace" ON pub
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              setPreselectedClientId(undefined)
-              setIsModalOpen(true)
-            }}
-            disabled={activeClients.length === 0 || tableMissing}
+            onClick={handleOpenCreateModal}
+            disabled={clientsList.length === 0 || tableMissing}
             className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 disabled:opacity-50 text-slate-950 font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition cursor-pointer"
           >
             <Plus className="h-4 w-4 stroke-[2.5]" />
@@ -367,7 +383,7 @@ CREATE POLICY "Trainers can delete workout plan items in their workspace" ON pub
               onClick={() => {
                 fetchExercises()
                 fetchPlans()
-                fetchInternalClients()
+                fetchClients()
               }}
               className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-lg text-xs flex items-center gap-2 transition cursor-pointer"
             >
@@ -398,8 +414,8 @@ CREATE POLICY "Trainers can delete workout plan items in their workspace" ON pub
               onChange={(e) => setSelectedClientFilter(e.target.value)}
               className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-emerald-500 transition cursor-pointer"
             >
-              <option value="all">All Clients ({activeClients.length})</option>
-              {activeClients.map((c) => (
+              <option value="all">All Clients ({clientsList.length})</option>
+              {clientsList.map((c) => (
                 <option key={c.id} value={c.id}>
                   Client: {c.name}
                 </option>
@@ -423,18 +439,15 @@ CREATE POLICY "Trainers can delete workout plan items in their workspace" ON pub
           <div>
             <h3 className="text-lg font-bold text-white">No Workout Plans Yet</h3>
             <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
-              {activeClients.length === 0
+              {clientsList.length === 0
                 ? 'Please add or seed clients in the Clients tab first before creating workout plans.'
                 : 'Build custom training plans with exercises, sets, and reps for your clients.'}
             </p>
           </div>
-          {activeClients.length > 0 && (
+          {clientsList.length > 0 && (
             <div className="flex items-center justify-center gap-3 pt-2">
               <button
-                onClick={() => {
-                  setPreselectedClientId(undefined)
-                  setIsModalOpen(true)
-                }}
+                onClick={handleOpenCreateModal}
                 disabled={tableMissing}
                 className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
               >
@@ -535,13 +548,14 @@ CREATE POLICY "Trainers can delete workout plan items in their workspace" ON pub
       {isModalOpen && (
         <WorkoutPlanFormModal
           workspaceId={workspaceId}
-          clients={activeClients}
+          clients={clientsList}
           exercises={exercises}
           preselectedClientId={preselectedClientId}
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onSaved={() => {
             fetchPlans()
+            fetchClients()
           }}
         />
       )}

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { supabase, type Workspace } from '../lib/supabase'
+import { useEffect, useState, useCallback } from 'react'
+import { supabase, type Workspace, type Client } from '../lib/supabase'
 import ClientsManager from './ClientsManager'
 import WorkoutPlansManager from './WorkoutPlansManager'
 import { 
@@ -25,12 +25,26 @@ interface DashboardProps {
 export default function Dashboard({ onSignOut }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'plans' | 'clients' | 'overview'>('plans')
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
+  const [clients, setClients] = useState<Client[]>([])
   const [allVisibleWorkspaces, setAllVisibleWorkspaces] = useState<Workspace[]>([])
   const [loading, setLoading] = useState(true)
   const [tableMissing, setTableMissing] = useState(false)
   const [copiedSql, setCopiedSql] = useState(false)
   const [userEmail, setUserEmail] = useState<string>('')
   const [userId, setUserId] = useState<string>('')
+
+  const fetchDashboardClients = useCallback(async (wsId: string) => {
+    try {
+      const { data } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('workspace_id', wsId)
+        .order('name', { ascending: true })
+      if (data) setClients(data)
+    } catch (err) {
+      console.error('Error fetching dashboard clients:', err)
+    }
+  }, [])
 
   const fetchWorkspace = async (retryCount = 0) => {
     if (retryCount === 0) setLoading(true)
@@ -81,6 +95,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
       setAllVisibleWorkspaces(list)
       if (list.length > 0) {
         setWorkspace(list[0])
+        fetchDashboardClients(list[0].id)
       } else {
         setWorkspace(null)
       }
@@ -271,12 +286,19 @@ ON public.workspaces FOR DELETE USING (auth.uid() = user_id);`
 
         {/* Tab 1: Workout Plans Page */}
         {activeTab === 'plans' && workspace && (
-          <WorkoutPlansManager workspaceId={workspace.id} />
+          <WorkoutPlansManager
+            workspaceId={workspace.id}
+            clients={clients}
+          />
         )}
 
         {/* Tab 2: Clients Page */}
         {activeTab === 'clients' && workspace && (
-          <ClientsManager workspaceId={workspace.id} trainerName={trainerDisplay} />
+          <ClientsManager
+            workspaceId={workspace.id}
+            trainerName={trainerDisplay}
+            onClientsUpdated={setClients}
+          />
         )}
 
         {/* Tab 3: Overview & Security */}

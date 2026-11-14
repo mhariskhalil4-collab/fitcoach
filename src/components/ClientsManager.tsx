@@ -22,9 +22,43 @@ import {
 interface ClientsManagerProps {
   workspaceId: string
   trainerName: string
+  onClientsUpdated?: (clients: Client[]) => void
 }
 
-export default function ClientsManager({ workspaceId }: ClientsManagerProps) {
+const SAMPLE_CLIENTS = [
+  {
+    name: 'Sara',
+    age: 28,
+    gender: 'Female',
+    goal: 'lose weight' as ClientGoal,
+    fitness_level: 'beginner' as FitnessLevel,
+    weight_kg: 68.0,
+    height_cm: 165.0,
+    notes: 'Focusing on caloric deficit, whole foods, and 3x weekly bodyweight strength sessions.',
+  },
+  {
+    name: 'Ahmed',
+    age: 25,
+    gender: 'Male',
+    goal: 'build muscle' as ClientGoal,
+    fitness_level: 'intermediate' as FitnessLevel,
+    weight_kg: 78.5,
+    height_cm: 180.0,
+    notes: 'Hypertrophy focused: 4-day upper/lower split targeting chest, back, and leg volume.',
+  },
+  {
+    name: 'Bilal',
+    age: 34,
+    gender: 'Male',
+    goal: 'get fit' as ClientGoal,
+    fitness_level: 'beginner' as FitnessLevel,
+    weight_kg: 82.0,
+    height_cm: 176.0,
+    notes: 'Improving functional mobility, core stability, and cardio endurance for general wellness.',
+  },
+]
+
+export default function ClientsManager({ workspaceId, onClientsUpdated }: ClientsManagerProps) {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [tableMissing, setTableMissing] = useState(false)
@@ -44,47 +78,34 @@ export default function ClientsManager({ workspaceId }: ClientsManagerProps) {
   const [isSeeding, setIsSeeding] = useState(false)
   const [copiedSql, setCopiedSql] = useState(false)
 
-  const sampleClientsPayload = [
-    {
-      workspace_id: workspaceId,
-      name: 'Sara',
-      age: 28,
-      gender: 'Female',
-      goal: 'lose weight' as ClientGoal,
-      fitness_level: 'beginner' as FitnessLevel,
-      weight_kg: 68.0,
-      height_cm: 165.0,
-      notes: 'Focusing on caloric deficit, whole foods, and 3x weekly bodyweight strength sessions.',
-    },
-    {
-      workspace_id: workspaceId,
-      name: 'Ahmed',
-      age: 25,
-      gender: 'Male',
-      goal: 'build muscle' as ClientGoal,
-      fitness_level: 'intermediate' as FitnessLevel,
-      weight_kg: 78.5,
-      height_cm: 180.0,
-      notes: 'Hypertrophy focused: 4-day upper/lower split targeting chest, back, and leg volume.',
-    },
-    {
-      workspace_id: workspaceId,
-      name: 'Bilal',
-      age: 34,
-      gender: 'Male',
-      goal: 'get fit' as ClientGoal,
-      fitness_level: 'beginner' as FitnessLevel,
-      weight_kg: 82.0,
-      height_cm: 176.0,
-      notes: 'Improving functional mobility, core stability, and cardio endurance for general wellness.',
-    },
-  ]
-
   const seedSampleClients = useCallback(async () => {
     setIsSeeding(true)
     try {
-      const { error } = await supabase.from('clients').insert(sampleClientsPayload)
-      if (error) throw error
+      // 1. Check existing clients in this workspace to prevent duplicate creation
+      const { data: existingClients, error: fetchErr } = await supabase
+        .from('clients')
+        .select('name')
+        .eq('workspace_id', workspaceId)
+
+      if (fetchErr) throw fetchErr
+
+      const existingNames = new Set(
+        (existingClients || []).map((c) => c.name.trim().toLowerCase())
+      )
+
+      // 2. Only insert sample clients that do NOT already exist by name
+      const clientsToInsert = SAMPLE_CLIENTS
+        .filter((sample) => !existingNames.has(sample.name.trim().toLowerCase()))
+        .map((sample) => ({
+          ...sample,
+          workspace_id: workspaceId,
+        }))
+
+      if (clientsToInsert.length > 0) {
+        const { error: insertErr } = await supabase.from('clients').insert(clientsToInsert)
+        if (insertErr) throw insertErr
+      }
+
       await fetchClients()
     } catch (err) {
       console.error('Error seeding clients:', err)
@@ -113,6 +134,9 @@ export default function ClientsManager({ workspaceId }: ClientsManagerProps) {
       }
 
       setClients(data || [])
+      if (onClientsUpdated && data) {
+        onClientsUpdated(data)
+      }
 
       // Auto-seed if 0 clients exist
       if (!data || data.length === 0) {
